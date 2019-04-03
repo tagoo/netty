@@ -277,7 +277,7 @@ public class DefaultFutureCompletionStageTest {
             assertTrue(stage.executor().inEventLoop());
 
             return 1;
-        }), CombineTestMode.COMPLETE);
+        }), CombineAndAcceptTestMode.COMPLETE);
     }
 
     @Test
@@ -288,7 +288,7 @@ public class DefaultFutureCompletionStageTest {
             assertFalse(stage.executor().inEventLoop());
 
             return 1;
-        }), CombineTestMode.COMPLETE);
+        }), CombineAndAcceptTestMode.COMPLETE);
     }
 
     @Test
@@ -301,7 +301,7 @@ public class DefaultFutureCompletionStageTest {
             assertFalse(stage.executor().inEventLoop());
             assertTrue(asyncExecutor.inEventLoop());
             return 1;
-        }, asyncExecutor), CombineTestMode.COMPLETE);
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE);
     }
 
     @Test
@@ -309,7 +309,7 @@ public class DefaultFutureCompletionStageTest {
         testThenCombine0((stage, other) -> stage.thenCombine(other, (v1, v2) -> {
             fail();
             return 1;
-        }), CombineTestMode.COMPLETE_EXCEPTIONAL);
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
     }
 
     @Test
@@ -317,7 +317,7 @@ public class DefaultFutureCompletionStageTest {
         testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
             fail();
             return 1;
-        }), CombineTestMode.COMPLETE_EXCEPTIONAL);
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
     }
 
     @Test
@@ -327,21 +327,21 @@ public class DefaultFutureCompletionStageTest {
         testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
             fail();
             return 1;
-        }, asyncExecutor), CombineTestMode.COMPLETE_EXCEPTIONAL);
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
     }
 
     @Test
     public void testThenCombineThrows() {
         testThenCombine0((stage, other) -> stage.thenCombine(other, (v1, v2) -> {
             throw EXCEPTION;
-        }), CombineTestMode.THROW);
+        }), CombineAndAcceptTestMode.THROW);
     }
 
     @Test
     public void testThenCombineAsyncThrows() {
         testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
             throw EXCEPTION;
-        }), CombineTestMode.THROW);
+        }), CombineAndAcceptTestMode.THROW);
     }
 
     @Test
@@ -350,17 +350,168 @@ public class DefaultFutureCompletionStageTest {
 
         testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
             throw EXCEPTION;
-        }, asyncExecutor), CombineTestMode.THROW);
+        }, asyncExecutor), CombineAndAcceptTestMode.THROW);
     }
 
-    private enum CombineTestMode {
+    @Test
+    public void testThenAcceptBoth() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBoth(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertTrue(stage.executor().inEventLoop());
+        }), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testThenAcceptBothAsync() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBothAsync(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertFalse(stage.executor().inEventLoop());
+        }), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testThenAcceptBothAsyncWithExecutor() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBothAsync(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertFalse(stage.executor().inEventLoop());
+            assertTrue(asyncExecutor.inEventLoop());
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testThenAcceptBothThrowable() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBoth(other, (v1, v2) -> {
+            fail();
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testThenAcceptBothAsyncThrowable() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBothAsync(other, (v1, v2) -> {
+            fail();
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testThenAcceptBothAsyncWithExecutorThrowable() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBothAsync(other, (v1, v2) -> {
+            fail();
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testThenAcceptBothThrows() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenAcceptBoth(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }), CombineAndAcceptTestMode.THROW);
+    }
+
+    @Test
+    public void testThenAcceptBothAsyncThrows() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }), CombineAndAcceptTestMode.THROW);
+    }
+
+    @Test
+    public void testThenAcceptBothAsyncWithExecutorThrows() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }, asyncExecutor), CombineAndAcceptTestMode.THROW);
+    }
+
+    @Test
+    public void testRunAfterBoth() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBoth(other, () -> {
+            assertTrue(stage.executor().inEventLoop());
+        }), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testRunAfterBothAsync() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            assertFalse(stage.executor().inEventLoop());
+        }), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testRunAfterBothAsyncWithExecutor() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            assertFalse(stage.executor().inEventLoop());
+            assertTrue(asyncExecutor.inEventLoop());
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE);
+    }
+
+    @Test
+    public void testRunAfterBothThrowable() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            fail();
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testRunAfterBothAsyncThrowable() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            fail();
+        }), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testRunAfterBothAsyncWithExecutorThrowable() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            fail();
+        }, asyncExecutor), CombineAndAcceptTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testRunAfterBothThrows() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            throw EXCEPTION;
+        }), CombineAndAcceptTestMode.THROW);
+    }
+
+    @Test
+    public void testRunAfterBothAsyncThrows() {
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            throw EXCEPTION;
+        }), CombineAndAcceptTestMode.THROW);
+    }
+
+    @Test
+    public void testRunAfterBothAsyncWithExecutorThrows() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenAcceptBothOrRunAfterBoth0((stage, other) -> stage.runAfterBothAsync(other, () -> {
+            throw EXCEPTION;
+        }, asyncExecutor), CombineAndAcceptTestMode.THROW);
+    }
+
+    private enum CombineAndAcceptTestMode {
         COMPLETE,
         COMPLETE_EXCEPTIONAL,
         THROW
     }
 
+    private void testThenAcceptBothOrRunAfterBoth0(BiFunction<FutureCompletionStage<Boolean>,
+            CompletionStage<String>, FutureCompletionStage<Void>> fn, CombineAndAcceptTestMode testMode) {
+        testThenCombine0((futureStage, stage) -> fn.apply(futureStage, stage).thenApply(v -> 1), testMode);
+    }
+
     private void testThenCombine0(BiFunction<FutureCompletionStage<Boolean>,
-            CompletionStage<String>, FutureCompletionStage<Integer>> fn, CombineTestMode testMode) {
+            CompletionStage<String>, FutureCompletionStage<Integer>> fn, CombineAndAcceptTestMode testMode) {
         EventExecutor executor = executor();
         for (int i = 0; i < 1000; i++) {
             Promise<Boolean> promise = executor.newPromise();

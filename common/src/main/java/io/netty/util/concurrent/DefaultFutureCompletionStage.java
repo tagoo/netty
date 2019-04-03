@@ -313,8 +313,8 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     public <U> FutureCompletionStage<Void> thenAcceptBothAsync(
             CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action, Executor executor) {
         requireNonNull(action, "action");
-        return thenCombineAsync(other, (value, error) -> {
-            action.accept(value, error);
+        return thenCombineAsync(other, (value, value2) -> {
+            action.accept(value, value2);
             return null;
         }, executor);
     }
