@@ -19,7 +19,7 @@ import io.netty.util.internal.StringUtil;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -59,126 +59,124 @@ public interface FutureCompletionStage<V> extends CompletionStage<V> {
     }
 
     @Override
-    default  <U> CompletionStage<U> thenApply(Function<? super V, ? extends U> fn) {
-        return thenApplyAsync(fn, ImmediateExecutor.INSTANCE);
-    }
+    <U> FutureCompletionStage<U> thenApply(Function<? super V, ? extends U> fn);
 
     @Override
-    default <U> CompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn) {
-        return thenApplyAsync(fn, ForkJoinPool.commonPool());
-    }
+    <U> FutureCompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn);
 
     @Override
-    default CompletionStage<Void> thenAccept(Consumer<? super V> action) {
-        return thenAcceptAsync(action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<Void> thenAccept(Consumer<? super V> action);
 
     @Override
-    default CompletionStage<Void> thenAcceptAsync(Consumer<? super V> action) {
-        return thenAcceptAsync(action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<Void> thenAcceptAsync(Consumer<? super V> action);
 
     @Override
-    default CompletionStage<Void> thenRun(Runnable action) {
-        return thenRunAsync(action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<Void> thenRun(Runnable action);
 
     @Override
-    default CompletionStage<Void> thenRunAsync(Runnable action) {
-        return thenRunAsync(action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<Void> thenRunAsync(Runnable action);
 
     @Override
-    default  <U, V1> CompletionStage<V1> thenCombine(
-            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn) {
-        return thenCombineAsync(other, fn, ImmediateExecutor.INSTANCE);
-    }
+    <U, V1> FutureCompletionStage<V1> thenCombine(
+            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn);
 
     @Override
-    default <U, V1> CompletionStage<V1> thenCombineAsync(
-            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn) {
-        return thenCombineAsync(other, fn, ForkJoinPool.commonPool());
-    }
+    <U, V1> FutureCompletionStage<V1> thenCombineAsync(
+            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn);
 
     @Override
-    default  <U> CompletionStage<Void> thenAcceptBoth(
-            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action) {
-        return thenAcceptBothAsync(other, action, ImmediateExecutor.INSTANCE);
-    }
+    <U> FutureCompletionStage<Void> thenAcceptBoth(
+            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action);
 
     @Override
-    default <U> CompletionStage<Void> thenAcceptBothAsync(
-            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action) {
-        return thenAcceptBothAsync(other, action, ForkJoinPool.commonPool());
-    }
+    <U> FutureCompletionStage<Void> thenAcceptBothAsync(
+            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action);
 
     @Override
-    default CompletionStage<Void> runAfterBoth(CompletionStage<?> other, Runnable action) {
-        return runAfterBothAsync(other, action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<Void> runAfterBoth(CompletionStage<?> other, Runnable action);
 
     @Override
-    default CompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action) {
-        return runAfterBothAsync(other, action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action);
 
     @Override
-    default  <U> CompletionStage<U> applyToEither(CompletionStage<? extends V> other, Function<? super V, U> fn) {
-        return applyToEitherAsync(other, fn, ImmediateExecutor.INSTANCE);
-    }
+    <U> FutureCompletionStage<U> applyToEither(CompletionStage<? extends V> other, Function<? super V, U> fn);
 
     @Override
-    default <U> CompletionStage<U> applyToEitherAsync(CompletionStage<? extends V> other, Function<? super V, U> fn) {
-        return applyToEitherAsync(other, fn, ForkJoinPool.commonPool());
-    }
+    <U> FutureCompletionStage<U> applyToEitherAsync(CompletionStage<? extends V> other, Function<? super V, U> fn);
 
     @Override
-    default CompletionStage<Void> acceptEither(CompletionStage<? extends V> other, Consumer<? super V> action) {
-        return acceptEitherAsync(other, action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<Void> acceptEither(CompletionStage<? extends V> other, Consumer<? super V> action);
 
     @Override
-    default CompletionStage<Void> acceptEitherAsync(CompletionStage<? extends V> other, Consumer<? super V> action) {
-        return acceptEitherAsync(other, action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<Void> acceptEitherAsync(CompletionStage<? extends V> other, Consumer<? super V> action);
 
     @Override
-    default CompletionStage<Void> runAfterEither(CompletionStage<?> other, Runnable action) {
-        return runAfterEitherAsync(other, action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<Void> runAfterEither(CompletionStage<?> other, Runnable action);
 
     @Override
-    default CompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action) {
-        return runAfterEitherAsync(other, action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action);
 
     @Override
-    default <U> CompletionStage<U> thenCompose(Function<? super V, ? extends CompletionStage<U>> fn) {
-        return thenComposeAsync(fn, ImmediateExecutor.INSTANCE);
-    }
+    <U> FutureCompletionStage<U> thenCompose(Function<? super V, ? extends CompletionStage<U>> fn);
 
     @Override
-    default <U> CompletionStage<U> thenComposeAsync(Function<? super V, ? extends CompletionStage<U>> fn) {
-        return thenComposeAsync(fn, ForkJoinPool.commonPool());
-    }
+    <U> FutureCompletionStage<U> thenComposeAsync(Function<? super V, ? extends CompletionStage<U>> fn);
 
     @Override
-    default CompletionStage<V> whenComplete(BiConsumer<? super V, ? super Throwable> action) {
-        return whenCompleteAsync(action, ImmediateExecutor.INSTANCE);
-    }
+    FutureCompletionStage<V> whenComplete(BiConsumer<? super V, ? super Throwable> action);
 
     @Override
-    default CompletionStage<V> whenCompleteAsync(BiConsumer<? super V, ? super Throwable> action) {
-        return whenCompleteAsync(action, ForkJoinPool.commonPool());
-    }
+    FutureCompletionStage<V> whenCompleteAsync(BiConsumer<? super V, ? super Throwable> action);
 
     @Override
-    default <U> CompletionStage<U> handle(BiFunction<? super V, Throwable, ? extends U> fn) {
-        return handleAsync(fn, ImmediateExecutor.INSTANCE);
-    }
+    <U> FutureCompletionStage<U> handle(BiFunction<? super V, Throwable, ? extends U> fn);
 
     @Override
-    default <U> CompletionStage<U> handleAsync(BiFunction<? super V, Throwable, ? extends U> fn) {
-        return handleAsync(fn, ForkJoinPool.commonPool());
-    }
+    <U> FutureCompletionStage<U> handleAsync(BiFunction<? super V, Throwable, ? extends U> fn);
+
+    @Override
+    <U> FutureCompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn, Executor executor);
+
+    @Override
+    FutureCompletionStage<Void> thenAcceptAsync(Consumer<? super V> action, Executor executor);
+
+    @Override
+    FutureCompletionStage<Void> thenRunAsync(Runnable action, Executor executor);
+
+    @Override
+    <U, V1> FutureCompletionStage<V1> thenCombineAsync(
+            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn, Executor executor);
+
+    @Override
+    <U> FutureCompletionStage<Void> thenAcceptBothAsync(
+            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action, Executor executor);
+
+    @Override
+    FutureCompletionStage<Void> runAfterBothAsync(
+            CompletionStage<?> other, Runnable action, Executor executor);
+
+    @Override
+    <U> FutureCompletionStage<U> applyToEitherAsync(
+            CompletionStage<? extends V> other, Function<? super V, U> fn, Executor executor);
+
+    @Override
+    FutureCompletionStage<Void> acceptEitherAsync(
+            CompletionStage<? extends V> other, Consumer<? super V> action, Executor executor);
+
+    @Override
+    FutureCompletionStage<Void> runAfterEitherAsync(
+            CompletionStage<?> other, Runnable action, Executor executor);
+
+    @Override
+    <U> FutureCompletionStage<U> thenComposeAsync(
+            Function<? super V, ? extends CompletionStage<U>> fn, Executor executor);
+
+    @Override
+    FutureCompletionStage<V> exceptionally(Function<Throwable, ? extends V> fn);
+
+    @Override
+    FutureCompletionStage<V> whenCompleteAsync(BiConsumer<? super V, ? super Throwable> action, Executor executor);
+
+    @Override
+    <U> FutureCompletionStage<U> handleAsync(BiFunction<? super V, Throwable, ? extends U> fn, Executor executor);
 }

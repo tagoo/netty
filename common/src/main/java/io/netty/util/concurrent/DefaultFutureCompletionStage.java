@@ -18,6 +18,7 @@ package io.netty.util.concurrent;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -37,6 +38,11 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
         ERROR
     }
 
+    // Just a marker
+    private static final Executor SAME_AS_FUTURE = task -> {
+        throw new IllegalStateException();
+    };
+
     private final Future<V> future;
 
     DefaultFutureCompletionStage(Future<V> future) {
@@ -49,7 +55,134 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public <U> CompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn, Executor executor) {
+    public <U> FutureCompletionStage<U> thenApply(Function<? super V, ? extends U> fn) {
+        return thenApplyAsync(fn, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn) {
+        return thenApplyAsync(fn, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<Void> thenAccept(Consumer<? super V> action) {
+        return thenAcceptAsync(action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<Void> thenAcceptAsync(Consumer<? super V> action) {
+        return thenAcceptAsync(action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<Void> thenRun(Runnable action) {
+        return thenRunAsync(action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<Void> thenRunAsync(Runnable action) {
+        return thenRunAsync(action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public  <U, V1> FutureCompletionStage<V1> thenCombine(
+            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn) {
+        return thenCombineAsync(other, fn, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U, V1> FutureCompletionStage<V1> thenCombineAsync(
+            CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn) {
+        return thenCombineAsync(other, fn, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public  <U> FutureCompletionStage<Void> thenAcceptBoth(
+            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action) {
+        return thenAcceptBothAsync(other, action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U> FutureCompletionStage<Void> thenAcceptBothAsync(
+            CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action) {
+        return thenAcceptBothAsync(other, action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<Void> runAfterBoth(CompletionStage<?> other, Runnable action) {
+        return runAfterBothAsync(other, action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action) {
+        return runAfterBothAsync(other, action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public  <U> FutureCompletionStage<U> applyToEither(
+            CompletionStage<? extends V> other, Function<? super V, U> fn) {
+        return applyToEitherAsync(other, fn, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> applyToEitherAsync(
+            CompletionStage<? extends V> other, Function<? super V, U> fn) {
+        return applyToEitherAsync(other, fn, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<Void> acceptEither(CompletionStage<? extends V> other, Consumer<? super V> action) {
+        return acceptEitherAsync(other, action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<Void> acceptEitherAsync(
+            CompletionStage<? extends V> other, Consumer<? super V> action) {
+        return acceptEitherAsync(other, action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<Void> runAfterEither(CompletionStage<?> other, Runnable action) {
+        return runAfterEitherAsync(other, action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action) {
+        return runAfterEitherAsync(other, action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> thenCompose(Function<? super V, ? extends CompletionStage<U>> fn) {
+        return thenComposeAsync(fn, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> thenComposeAsync(Function<? super V, ? extends CompletionStage<U>> fn) {
+        return thenComposeAsync(fn, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public FutureCompletionStage<V> whenComplete(BiConsumer<? super V, ? super Throwable> action) {
+        return whenCompleteAsync(action, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public FutureCompletionStage<V> whenCompleteAsync(BiConsumer<? super V, ? super Throwable> action) {
+        return whenCompleteAsync(action, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> handle(BiFunction<? super V, Throwable, ? extends U> fn) {
+        return handleAsync(fn, SAME_AS_FUTURE);
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> handleAsync(BiFunction<? super V, Throwable, ? extends U> fn) {
+        return handleAsync(fn, ForkJoinPool.commonPool());
+    }
+
+    @Override
+    public <U> FutureCompletionStage<U> thenApplyAsync(Function<? super V, ? extends U> fn, Executor executor) {
         requireNonNull(fn, "fn");
         requireNonNull(executor, "executor");
 
@@ -82,7 +215,7 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public CompletionStage<Void> thenAcceptAsync(Consumer<? super V> action, Executor executor) {
+    public FutureCompletionStage<Void> thenAcceptAsync(Consumer<? super V> action, Executor executor) {
         requireNonNull(action, "action");
         requireNonNull(executor, "executor");
 
@@ -113,12 +246,12 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public CompletionStage<Void> thenRunAsync(Runnable action, Executor executor) {
+    public FutureCompletionStage<Void> thenRunAsync(Runnable action, Executor executor) {
         return thenAcceptAsync(ignore -> action.run(), executor);
     }
 
     @Override
-    public <U, V1> CompletionStage<V1> thenCombineAsync(
+    public <U, V1> FutureCompletionStage<V1> thenCombineAsync(
             CompletionStage<? extends U> other, BiFunction<? super V, ? super U, ? extends V1> fn, Executor executor) {
         requireNonNull(other, "other");
         requireNonNull(fn, "fn");
@@ -162,12 +295,16 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
                     Promise<V1> promise, U value1, V value2, BiFunction<? super V, ? super U, ? extends V1> fn) {
                 applyAndNotify(promise, value2, value1, fn);
             }
-        }, executor);
+        }, otherExecutor(executor));
         return promise.asStage();
     }
 
+    private Executor otherExecutor(Executor executor) {
+        return executor == SAME_AS_FUTURE ? executor() : executor;
+    }
+
     @Override
-    public <U> CompletionStage<Void> thenAcceptBothAsync(
+    public <U> FutureCompletionStage<Void> thenAcceptBothAsync(
             CompletionStage<? extends U> other, BiConsumer<? super V, ? super U> action, Executor executor) {
         requireNonNull(action, "action");
         return thenCombineAsync(other, (value, error) -> {
@@ -177,7 +314,7 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public CompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action, Executor executor) {
+    public FutureCompletionStage<Void> runAfterBothAsync(CompletionStage<?> other, Runnable action, Executor executor) {
         requireNonNull(action, "action");
         return thenCombineAsync(other, (ignoreValue, ignoreError) -> {
             action.run();
@@ -186,7 +323,7 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public <U> CompletionStage<U> applyToEitherAsync(
+    public <U> FutureCompletionStage<U> applyToEitherAsync(
             CompletionStage<? extends V> other, Function<? super V, U> fn, Executor executor) {
         requireNonNull(other, "other");
         requireNonNull(fn, "fn");
@@ -199,12 +336,12 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
             }
         };
         whenCompleteAsync(consumer, executor);
-        other.whenCompleteAsync(consumer, executor);
+        other.whenCompleteAsync(consumer, otherExecutor(executor));
         return promise.asStage();
     }
 
     @Override
-    public CompletionStage<Void> acceptEitherAsync(
+    public FutureCompletionStage<Void> acceptEitherAsync(
             CompletionStage<? extends V> other, Consumer<? super V> action, Executor executor) {
         requireNonNull(other, "other");
         requireNonNull(action, "action");
@@ -218,12 +355,13 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
             }
         };
         whenCompleteAsync(consumer, executor);
-        other.whenCompleteAsync(consumer, executor);
+        other.whenCompleteAsync(consumer, otherExecutor(executor));
         return promise.asStage();
     }
 
     @Override
-    public CompletionStage<Void> runAfterEitherAsync(CompletionStage<?> other, Runnable action, Executor executor) {
+    public FutureCompletionStage<Void> runAfterEitherAsync(
+            CompletionStage<?> other, Runnable action, Executor executor) {
         requireNonNull(other, "other");
         requireNonNull(action, "action");
 
@@ -236,12 +374,12 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
             }
         };
         whenCompleteAsync(consumer, executor);
-        other.whenCompleteAsync(consumer, executor);
+        other.whenCompleteAsync(consumer, otherExecutor(executor));
         return promise.asStage();
     }
 
     @Override
-    public <U> CompletionStage<U> thenComposeAsync(
+    public <U> FutureCompletionStage<U> thenComposeAsync(
             Function<? super V, ? extends CompletionStage<U>> fn, Executor executor) {
         requireNonNull(fn, "fn");
         requireNonNull(executor, "executor");
@@ -275,7 +413,7 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public CompletionStage<V> exceptionally(Function<Throwable, ? extends V> fn) {
+    public FutureCompletionStage<V> exceptionally(Function<Throwable, ? extends V> fn) {
         requireNonNull(fn, "fn");
 
         Promise<V> promise = executor().newPromise();
@@ -299,7 +437,8 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public CompletionStage<V> whenCompleteAsync(BiConsumer<? super V, ? super Throwable> action, Executor executor) {
+    public FutureCompletionStage<V> whenCompleteAsync(
+            BiConsumer<? super V, ? super Throwable> action, Executor executor) {
         requireNonNull(action, "action");
         requireNonNull(executor, "executor");
 
@@ -327,7 +466,8 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     @Override
-    public <U> CompletionStage<U> handleAsync(BiFunction<? super V, Throwable, ? extends U> fn, Executor executor) {
+    public <U> FutureCompletionStage<U> handleAsync(
+            BiFunction<? super V, Throwable, ? extends U> fn, Executor executor) {
         requireNonNull(fn, "fn");
         requireNonNull(executor, "executor");
 
@@ -362,7 +502,7 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
     }
 
     private static boolean executeDirectly(Executor executor) {
-        return executor == ImmediateExecutor.INSTANCE || executor == ImmediateEventExecutor.INSTANCE;
+        return executor == SAME_AS_FUTURE;
     }
 
     private static void safeExecute(Executor executor, Runnable task, Promise<?> promise) {
