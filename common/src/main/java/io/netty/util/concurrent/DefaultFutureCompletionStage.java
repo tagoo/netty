@@ -268,13 +268,19 @@ final class DefaultFutureCompletionStage<V> implements FutureCompletionStage<V> 
                     if (!reference.compareAndSet(Marker.EMPTY, v)) {
                         Object rawValue = reference.get();
                         if (rawValue == Marker.ERROR) {
-                            assert promise.isDone();
                             return;
                         }
-                        applyAndNotify0(promise, (T1) v, (T2) rawValue, fn);
+                        try {
+                            applyAndNotify0(promise, (T1) v, (T2) rawValue, fn);
+                        } catch (Throwable e) {
+                            e.printStackTrace();
+                        }
                     }
-                } else if (reference.compareAndSet(Marker.EMPTY, Marker.ERROR)) {
-                    promise.setFailure(error);
+                } else {
+                    if (reference.getAndSet(Marker.ERROR) != Marker.ERROR) {
+                        // Did not fail the promise before, do it now.
+                        promise.setFailure(error);
+                    }
                 }
             }
 

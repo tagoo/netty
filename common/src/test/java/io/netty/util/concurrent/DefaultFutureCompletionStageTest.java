@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -40,6 +42,8 @@ public class DefaultFutureCompletionStageTest {
 
     private static EventExecutorGroup group;
     private static EventExecutorGroup asyncExecutorGroup;
+    private static final IllegalStateException EXCEPTION = new IllegalStateException();
+    private static final String EXPECTED_STRING = "test";
 
     @BeforeClass
     public static void setup() {
@@ -59,6 +63,14 @@ public class DefaultFutureCompletionStageTest {
 
     private static EventExecutor asyncExecutor() {
         return asyncExecutorGroup.next();
+    }
+
+    private static Future<Boolean> newSucceededFuture() {
+        return executor().newSucceededFuture(Boolean.TRUE);
+    }
+
+    private static <T> Future<T> newFailedFuture() {
+        return executor().newFailedFuture(EXCEPTION);
     }
 
     @Test
@@ -85,7 +97,7 @@ public class DefaultFutureCompletionStageTest {
             assertTrue(stage.executor().inEventLoop());
 
             return Boolean.FALSE;
-        }));
+        }), false);
     }
 
     @Test
@@ -95,7 +107,7 @@ public class DefaultFutureCompletionStageTest {
             assertFalse(stage.executor().inEventLoop());
 
             return Boolean.FALSE;
-        }));
+        }), false);
     }
 
     @Test
@@ -107,49 +119,47 @@ public class DefaultFutureCompletionStageTest {
             assertTrue(asyncExecutor.inEventLoop());
 
             return Boolean.FALSE;
-        }, asyncExecutor));
-    }
-
-    private void testThenApply0(Function<FutureCompletionStage<Boolean>, FutureCompletionStage<Boolean>> fn) {
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, fn.apply(stage).future().syncUninterruptibly().getNow());
+        }, asyncExecutor), false);
     }
 
     @Test
     public void testThenApplyFunctionThrows() {
-        testThenApplyFunctionThrows((stage, exception) -> stage.thenApply(v -> {
-            throw exception;
-        }));
+        testThenApply0(stage -> stage.thenApply(v -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenApplyAsyncFunctionThrows() {
-        testThenApplyFunctionThrows((stage, exception) -> stage.thenApplyAsync(v -> {
-            throw exception;
-        }));
+        testThenApply0(stage -> stage.thenApplyAsync(v -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenApplyAsyncWithExecutorFunctionThrows() {
         EventExecutor asyncExecutor = asyncExecutor();
-        testThenApplyFunctionThrows((stage, exception) -> stage.thenApplyAsync(v -> {
-            throw exception;
-        }, asyncExecutor));
+        testThenApply0(stage -> stage.thenApplyAsync(v -> {
+            throw EXCEPTION;
+        }, asyncExecutor), true);
     }
 
-    private void testThenApplyFunctionThrows(
-            BiFunction<FutureCompletionStage<Boolean>, IllegalStateException, FutureCompletionStage<Boolean>> fn) {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
+    private void testHandle0(Future<Boolean> future,
+                             Function<FutureCompletionStage<Boolean>, FutureCompletionStage<Boolean>> fn,
+                             boolean exception) {
         FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            fn.apply(stage, exception).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
+
+        Future<Boolean> f = fn.apply(stage).future().awaitUninterruptibly();
+        if (exception) {
+            assertSame(EXCEPTION, f.cause());
+        } else {
+            assertSame(Boolean.FALSE, f.syncUninterruptibly().getNow());
         }
+    }
+
+    private void testThenApply0(
+            Function<FutureCompletionStage<Boolean>, FutureCompletionStage<Boolean>> fn, boolean exception) {
+        testHandle0(newSucceededFuture(), fn, exception);
     }
 
     @Test
@@ -157,7 +167,7 @@ public class DefaultFutureCompletionStageTest {
         testThenAccept0(stage -> stage.thenAccept(v -> {
             assertSame(Boolean.TRUE, v);
             assertTrue(stage.executor().inEventLoop());
-        }));
+        }), false);
     }
 
     @Test
@@ -166,7 +176,7 @@ public class DefaultFutureCompletionStageTest {
             assertSame(Boolean.TRUE, v);
 
             assertFalse(stage.executor().inEventLoop());
-        }));
+        }), false);
     }
 
     @Test
@@ -177,48 +187,40 @@ public class DefaultFutureCompletionStageTest {
 
             assertFalse(stage.executor().inEventLoop());
             assertTrue(asyncExecutor.inEventLoop());
-        }, asyncExecutor));
-    }
-
-    private void testThenAccept0(Function<FutureCompletionStage<Boolean>, FutureCompletionStage<Void>> fn) {
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertNull(fn.apply(stage).future().syncUninterruptibly().getNow());
+        }, asyncExecutor), false);
     }
 
     @Test
     public void testThenAcceptConsumerThrows() {
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenAccept(v -> {
-            throw e;
-        }));
+        testThenAccept0(stage -> stage.thenAccept(v -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenAcceptAsyncConsumerThrows() {
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenAcceptAsync(v -> {
-            throw e;
-        }));
+        testThenAccept0(stage -> stage.thenAcceptAsync(v -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenAcceptAsyncWithExecutorConsumerThrows() {
         EventExecutor asyncExecutor = asyncExecutor();
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenAcceptAsync(v -> {
-            throw e;
-        }, asyncExecutor));
+        testThenAccept0(stage -> stage.thenAcceptAsync(v -> {
+            throw EXCEPTION;
+        }, asyncExecutor), true);
     }
 
-    private void testThenAcceptConsumerThrows0(
-            BiFunction<FutureCompletionStage<Boolean>, IllegalStateException, FutureCompletionStage<Void>> fn) {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
+    private void testThenAccept0(
+            Function<FutureCompletionStage<Boolean>, FutureCompletionStage<Void>> fn, boolean exception) {
+        Future<Boolean> future = newSucceededFuture();
         FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            fn.apply(stage, exception).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
+        Future<Void> f = fn.apply(stage).future().awaitUninterruptibly();
+        if (exception) {
+            assertSame(EXCEPTION, f.cause());
+        } else {
+            assertNull(f.syncUninterruptibly().getNow());
         }
     }
 
@@ -226,14 +228,14 @@ public class DefaultFutureCompletionStageTest {
     public void testThenRun() {
         testThenAccept0(stage -> stage.thenRun(() -> {
             assertTrue(stage.executor().inEventLoop());
-        }));
+        }), false);
     }
 
     @Test
     public void testThenRunAsync() {
         testThenAccept0(stage -> stage.thenRunAsync(() -> {
             assertFalse(stage.executor().inEventLoop());
-        }));
+        }), false);
     }
 
     @Test
@@ -242,360 +244,276 @@ public class DefaultFutureCompletionStageTest {
         testThenAccept0(stage -> stage.thenRunAsync(() -> {
             assertFalse(stage.executor().inEventLoop());
             assertTrue(asyncExecutor.inEventLoop());
-        }, asyncExecutor));
+        }, asyncExecutor), false);
     }
 
     @Test
     public void testThenRunTaskThrows() {
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenRun(() -> {
-            throw e;
-        }));
+        testThenAccept0(stage -> stage.thenRun(() -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenRunAsyncTaskThrows() {
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenRunAsync(() -> {
-            throw e;
-        }));
+        testThenAccept0(stage -> stage.thenRunAsync(() -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testThenRunAsyncWithExecutorTaskThrows() {
         EventExecutor asyncExecutor = asyncExecutor();
-        testThenAcceptConsumerThrows0((stage, e) -> stage.thenRunAsync(() -> {
-            throw e;
-        }, asyncExecutor));
+        testThenAccept0(stage -> stage.thenRunAsync(() -> {
+            throw EXCEPTION;
+        }, asyncExecutor), true);
     }
 
     @Test
     public void testThenCombine() {
-        EventExecutor executor = executor();
-        String expected = "test";
-        for (int i = 0; i < 1000; i++) {
-            Promise<Boolean> promise = executor.newPromise();
-            FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(promise);
-            CompletableFuture<String> completableFuture = new CompletableFuture<>();
+        testThenCombine0((stage, other) -> stage.thenCombine(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertTrue(stage.executor().inEventLoop());
 
-            Future<Integer> f = stage.thenCombine(completableFuture, (v1, v2) -> {
-                assertSame(v1, Boolean.TRUE);
-                assertSame(v2, expected);
-                assertTrue(executor.inEventLoop());
-
-                return 1;
-            }).future();
-
-            List<Runnable> runnables = new ArrayList<>();
-            Collections.addAll(runnables, () -> completableFuture.complete(expected),
-                    () -> promise.setSuccess(Boolean.TRUE));
-            Collections.shuffle(runnables);
-
-            for (Runnable task : runnables) {
-                ForkJoinPool.commonPool().execute(task);
-            }
-            assertEquals(1, f.syncUninterruptibly().getNow().intValue());
-        }
+            return 1;
+        }), CombineTestMode.COMPLETE);
     }
 
     @Test
     public void testThenCombineAsync() {
-        EventExecutor executor = executor();
-        String expected = "test";
-        for (int i = 0; i < 1000; i++) {
-            Promise<Boolean> promise = executor.newPromise();
-            FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(promise);
-            CompletableFuture<String> completableFuture = new CompletableFuture<>();
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertFalse(stage.executor().inEventLoop());
 
-            Future<Integer> f = stage.thenCombineAsync(completableFuture, (v1, v2) -> {
-                assertSame(v1, Boolean.TRUE);
-                assertSame(v2, expected);
-                assertFalse(executor.inEventLoop());
-                return 1;
-            }).future();
-
-            List<Runnable> runnables = new ArrayList<>();
-            Collections.addAll(runnables, () -> completableFuture.complete(expected),
-                    () -> promise.setSuccess(Boolean.TRUE));
-            Collections.shuffle(runnables);
-
-            for (Runnable task : runnables) {
-                ForkJoinPool.commonPool().execute(task);
-            }
-            assertEquals(1, f.syncUninterruptibly().getNow().intValue());
-        }
+            return 1;
+        }), CombineTestMode.COMPLETE);
     }
 
     @Test
     public void testThenCombineAsyncWithExecutor() {
-        EventExecutor executor = executor();
         EventExecutor asyncExecutor = asyncExecutor();
-        String expected = "test";
-        for (int i = 0; i < 1000; i++) {
-            Promise<Boolean> promise = executor.newPromise();
-            FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(promise);
-            CompletableFuture<String> completableFuture = new CompletableFuture<>();
 
-            Future<Integer> f = stage.thenCombineAsync(completableFuture, (v1, v2) -> {
-                assertSame(v1, Boolean.TRUE);
-                assertSame(v2, expected);
-                assertFalse(executor.inEventLoop());
-                return 1;
-            }, asyncExecutor).future();
-
-            List<Runnable> runnables = new ArrayList<>();
-            Collections.addAll(runnables, () -> completableFuture.complete(expected),
-                    () -> promise.setSuccess(Boolean.TRUE));
-            Collections.shuffle(runnables);
-
-            for (Runnable task : runnables) {
-                ForkJoinPool.commonPool().execute(task);
-            }
-            assertEquals(1, f.syncUninterruptibly().getNow().intValue());
-        }
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            assertSame(v1, Boolean.TRUE);
+            assertSame(v2, EXPECTED_STRING);
+            assertFalse(stage.executor().inEventLoop());
+            assertTrue(asyncExecutor.inEventLoop());
+            return 1;
+        }, asyncExecutor), CombineTestMode.COMPLETE);
     }
 
     @Test
     public void testThenCombineThrowable() {
-        IllegalStateException exception = new IllegalStateException();
-
-        EventExecutor executor = executor();
-        for (int i = 0; i < 1000; i++) {
-            Promise<Boolean> promise = executor.newPromise();
-            FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(promise);
-            CompletableFuture<String> completableFuture = new CompletableFuture<>();
-
-            Future<?> f = stage.thenCombineAsync(completableFuture, (v1, v2) -> {
-                fail();
-                return null;
-            }).future();
-
-            List<Runnable> runnables = new ArrayList<>();
-            Collections.addAll(runnables, () -> completableFuture.completeExceptionally(exception),
-                    () -> promise.tryFailure(exception));
-            Collections.shuffle(runnables);
-
-            for (Runnable task : runnables) {
-                ForkJoinPool.commonPool().execute(task);
-            }
-            assertSame(exception, f.awaitUninterruptibly().cause());
-        }
+        testThenCombine0((stage, other) -> stage.thenCombine(other, (v1, v2) -> {
+            fail();
+            return 1;
+        }), CombineTestMode.COMPLETE_EXCEPTIONAL);
     }
 
     @Test
     public void testThenCombineAsyncThrowable() {
-        IllegalStateException exception = new IllegalStateException();
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            fail();
+            return 1;
+        }), CombineTestMode.COMPLETE_EXCEPTIONAL);
+    }
 
-        EventExecutor executor = executor();
+    @Test
+    public void testThenCombineAsyncWithExecutorThrowable() {
         EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            fail();
+            return 1;
+        }, asyncExecutor), CombineTestMode.COMPLETE_EXCEPTIONAL);
+    }
+
+    @Test
+    public void testThenCombineThrows() {
+        testThenCombine0((stage, other) -> stage.thenCombine(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }), CombineTestMode.THROW);
+    }
+
+    @Test
+    public void testThenCombineAsyncThrows() {
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }), CombineTestMode.THROW);
+    }
+
+    @Test
+    public void testThenCombineAsyncWithExecutorThrows() {
+        EventExecutor asyncExecutor = asyncExecutor();
+
+        testThenCombine0((stage, other) -> stage.thenCombineAsync(other, (v1, v2) -> {
+            throw EXCEPTION;
+        }, asyncExecutor), CombineTestMode.THROW);
+    }
+
+    private enum CombineTestMode {
+        COMPLETE,
+        COMPLETE_EXCEPTIONAL,
+        THROW
+    }
+
+    private void testThenCombine0(BiFunction<FutureCompletionStage<Boolean>,
+            CompletionStage<String>, FutureCompletionStage<Integer>> fn, CombineTestMode testMode) {
+        EventExecutor executor = executor();
         for (int i = 0; i < 1000; i++) {
             Promise<Boolean> promise = executor.newPromise();
             FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(promise);
             CompletableFuture<String> completableFuture = new CompletableFuture<>();
 
-            Future<?> f = stage.thenCombineAsync(completableFuture, (v1, v2) -> {
-                fail();
-                return null;
-            }, asyncExecutor).future();
+            Future<Integer> f = fn.apply(stage, completableFuture).future();
 
-            List<Runnable> runnables = new ArrayList<>();
-            Collections.addAll(runnables, () -> completableFuture.completeExceptionally(exception),
-                    () -> promise.tryFailure(exception));
+            List<Runnable> runnables = new ArrayList<>(2);
+            switch (testMode) {
+                case THROW:
+                    Collections.addAll(runnables, () -> completableFuture.completeExceptionally(EXCEPTION),
+                            () -> promise.setFailure(EXCEPTION));
+                    break;
+                case COMPLETE_EXCEPTIONAL:
+                    int random = ThreadLocalRandom.current().nextInt(0, 3);
+                    if (random == 0) {
+                        Collections.addAll(runnables, () -> completableFuture.complete(EXPECTED_STRING),
+                                () -> promise.setFailure(EXCEPTION));
+                    } else if (random == 1) {
+                        Collections.addAll(runnables, () -> completableFuture.completeExceptionally(EXCEPTION),
+                                () -> promise.setSuccess(Boolean.TRUE));
+                    } else {
+                        Collections.addAll(runnables, () -> completableFuture.completeExceptionally(EXCEPTION),
+                                () -> promise.setFailure(EXCEPTION));
+                    }
+                    break;
+                case COMPLETE:
+                    Collections.addAll(runnables, () -> completableFuture.complete(EXPECTED_STRING),
+                            () -> promise.setSuccess(Boolean.TRUE));
+                    break;
+                default:
+                    fail();
+            }
+
             Collections.shuffle(runnables);
 
             for (Runnable task : runnables) {
                 ForkJoinPool.commonPool().execute(task);
             }
-            assertSame(exception, f.awaitUninterruptibly().cause());
-        }
-    }
 
-    /*
-    @Test
-    public void testHandleAsyncWithExecutorThrowable() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        EventExecutor asyncExecutor = asyncExecutor();
-        Future<Boolean> future = executor.newFailedFuture(exception);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handleAsync((v, cause) -> {
-            assertSame(exception, cause);
-            assertNull(v);
+            f.awaitUninterruptibly();
 
-            assertFalse(executor.inEventLoop());
-            assertTrue(asyncExecutor.inEventLoop());
-            return Boolean.FALSE;
-        }, asyncExecutor).future().syncUninterruptibly().getNow());
-    }
-
-    @Test
-    public void testHandleFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handle((v, cause) -> {
-                throw exception;
-            }).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
+            switch (testMode) {
+                case COMPLETE_EXCEPTIONAL:
+                case THROW:
+                    assertSame(EXCEPTION, f.cause());
+                    break;
+                case COMPLETE:
+                    assertEquals(1, f.syncUninterruptibly().getNow().intValue());
+                    break;
+                default:
+                    fail();
+            }
         }
     }
 
     @Test
-    public void testHandleAsyncFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handleAsync((v, cause) -> {
-                throw exception;
-            }).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
-        }
-    }
-
-    @Test
-    public void testHandleAsyncWithExecutorFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        EventExecutor asyncExecutor = asyncExecutor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handleAsync((v, cause) -> {
-                throw exception;
-            }, asyncExecutor).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
-        }
-    }
-    */
-
-    @Test
-    public void testHandleAsync() {
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handleAsync((v, cause) -> {
+    public void testHandle() {
+        testHandle0(newSucceededFuture(), stage -> stage.handle((v, cause) -> {
             assertSame(Boolean.TRUE, v);
             assertNull(cause);
 
-            assertFalse(executor.inEventLoop());
+            assertTrue(stage.executor().inEventLoop());
 
             return Boolean.FALSE;
-        }).future().syncUninterruptibly().getNow());
+        }), false);
+    }
+
+    @Test
+    public void testHandleAsync() {
+        testHandle0(newSucceededFuture(), stage -> stage.handleAsync((v, cause) -> {
+            assertSame(Boolean.TRUE, v);
+            assertNull(cause);
+
+            assertFalse(stage.executor().inEventLoop());
+
+            return Boolean.FALSE;
+        }), false);
     }
 
     @Test
     public void testHandleAsyncWithExecutor() {
-        EventExecutor executor = executor();
         EventExecutor asyncExecutor = asyncExecutor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handleAsync((v, cause) -> {
+
+        testHandle0(newSucceededFuture(), stage -> stage.handleAsync((v, cause) -> {
             assertSame(Boolean.TRUE, v);
             assertNull(cause);
 
-            assertFalse(executor.inEventLoop());
+            assertFalse(stage.executor().inEventLoop());
             assertTrue(asyncExecutor.inEventLoop());
+
             return Boolean.FALSE;
-        }, asyncExecutor).future().syncUninterruptibly().getNow());
+        }, asyncExecutor), false);
     }
 
     @Test
     public void testHandleThrowable() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newFailedFuture(exception);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handle((v, cause) -> {
-            assertSame(exception, cause);
+        testHandle0(newFailedFuture(), stage -> stage.handle((v, cause) -> {
+            assertSame(EXCEPTION, cause);
             assertNull(v);
 
-            assertTrue(executor.inEventLoop());
+            assertTrue(stage.future().executor().inEventLoop());
 
             return Boolean.FALSE;
-        }).future().syncUninterruptibly().getNow());
+        }), false);
     }
 
     @Test
     public void testHandleAsyncThrowable() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newFailedFuture(exception);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handleAsync((v, cause) -> {
-            assertSame(exception, cause);
+        testHandle0(newFailedFuture(), stage -> stage.handleAsync((v, cause) -> {
+            assertSame(EXCEPTION, cause);
             assertNull(v);
 
-            assertFalse(executor.inEventLoop());
+            assertFalse(stage.future().executor().inEventLoop());
 
             return Boolean.FALSE;
-        }).future().syncUninterruptibly().getNow());
+        }), false);
     }
 
     @Test
     public void testHandleAsyncWithExecutorThrowable() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
         EventExecutor asyncExecutor = asyncExecutor();
-        Future<Boolean> future = executor.newFailedFuture(exception);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        assertSame(Boolean.FALSE, stage.handleAsync((v, cause) -> {
-            assertSame(exception, cause);
+        testHandle0(newFailedFuture(), stage -> stage.handleAsync((v, cause) -> {
+            assertSame(EXCEPTION, cause);
             assertNull(v);
 
-            assertFalse(executor.inEventLoop());
+            assertFalse(stage.future().executor().inEventLoop());
             assertTrue(asyncExecutor.inEventLoop());
+
             return Boolean.FALSE;
-        }, asyncExecutor).future().syncUninterruptibly().getNow());
+        }, asyncExecutor), false);
     }
 
     @Test
     public void testHandleFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handle((v, cause) -> {
-                throw exception;
-            }).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
-        }
+        testHandle0(newSucceededFuture(), stage -> stage.handle((v, cause) -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testHandleAsyncFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handleAsync((v, cause) -> {
-                throw exception;
-            }).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
-        }
+        testHandle0(newSucceededFuture(), stage -> stage.handleAsync((v, cause) -> {
+            throw EXCEPTION;
+        }), true);
     }
 
     @Test
     public void testHandleAsyncWithExecutorFunctionThrows() {
-        IllegalStateException exception = new IllegalStateException();
-        EventExecutor executor = executor();
         EventExecutor asyncExecutor = asyncExecutor();
-        Future<Boolean> future = executor.newSucceededFuture(Boolean.TRUE);
-        FutureCompletionStage<Boolean> stage = new DefaultFutureCompletionStage<>(future);
-        try {
-            stage.handleAsync((v, cause) -> {
-                throw exception;
-            }, asyncExecutor).future().syncUninterruptibly();
-        } catch (IllegalStateException e) {
-            assertSame(exception, e);
-        }
+        testHandle0(newSucceededFuture(), stage -> stage.handleAsync((v, cause) -> {
+            throw EXCEPTION;
+        }, asyncExecutor), true);
     }
 }
