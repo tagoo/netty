@@ -17,7 +17,6 @@ package io.netty.channel;
 
 import static java.util.Objects.requireNonNull;
 
-import io.netty.util.concurrent.AbstractFuture;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;

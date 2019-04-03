@@ -27,7 +27,10 @@ import java.util.concurrent.TimeUnit;
 public abstract class CompleteFuture<V> implements Future<V> {
 
     private final EventExecutor executor;
-    private final CompletionStage<V> stage;
+
+    // It is fine to not make this volatile as even if we override the value in there it does not matter as
+    // DefaultFutureCompletionStage has no state itself and is just a wrapper around this CompletableFuture instance.
+    private DefaultFutureCompletionStage<V> stage;
 
     /**
      * Creates a new instance.
@@ -36,7 +39,6 @@ public abstract class CompleteFuture<V> implements Future<V> {
      */
     protected CompleteFuture(EventExecutor executor) {
         this.executor = executor;
-        stage = new CompletionStageAdapter<>(this);
     }
 
     /**
@@ -152,7 +154,11 @@ public abstract class CompleteFuture<V> implements Future<V> {
     }
 
     @Override
-    public CompletionStage<V> asStage() {
-        return stage;
+    public FutureCompletionStage<V> asStage() {
+        DefaultFutureCompletionStage<V> stageAdapter = stage;
+        if (stageAdapter == null) {
+            stage = stageAdapter = new DefaultFutureCompletionStage<>(this);
+        }
+        return stageAdapter;
     }
 }

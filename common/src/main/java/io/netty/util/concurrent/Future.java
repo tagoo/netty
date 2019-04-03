@@ -16,7 +16,6 @@
 package io.netty.util.concurrent;
 
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -204,10 +203,10 @@ public interface Future<V> extends java.util.concurrent.Future<V> {
     }
 
     /**
-     * Returns a {@link CompletionStage} that reflects the state of this {@link Future} and so will receive
+     * Returns a {@link FutureCompletionStage} that reflects the state of this {@link Future} and so will receive
      * all updates as well.
      */
-    default CompletionStage<V> asStage() {
-        return new CompletionStageAdapter<>(this);
+    default FutureCompletionStage<V> asStage() {
+        return new DefaultFutureCompletionStage<>(this);
     }
 }
