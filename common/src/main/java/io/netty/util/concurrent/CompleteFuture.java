@@ -18,7 +18,6 @@ package io.netty.util.concurrent;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 /**
