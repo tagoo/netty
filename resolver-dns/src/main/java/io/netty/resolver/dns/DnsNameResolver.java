@@ -65,10 +65,13 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 
@@ -109,7 +112,7 @@ public class DnsNameResolver extends InetNameResolver {
     private static final int DEFAULT_NDOTS;
 
     static {
-        if (NetUtil.isIpV4StackPreferred()) {
+        if (NetUtil.isIpV4StackPreferred() || !anyInterfaceSupportsIpV6()) {
             DEFAULT_RESOLVE_ADDRESS_TYPES = ResolvedAddressTypes.IPV4_ONLY;
             LOCALHOST_ADDRESS = NetUtil.LOCALHOST4;
         } else {
@@ -143,6 +146,28 @@ public class DnsNameResolver extends InetNameResolver {
             ndots = UnixResolverDnsServerAddressStreamProvider.DEFAULT_NDOTS;
         }
         DEFAULT_NDOTS = ndots;
+    }
+
+    /**
+     * Returns {@code true} if any {@link NetworkInterface} supports {@code IPv6}, {@code false} otherwise.
+     */
+    private static boolean anyInterfaceSupportsIpV6() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    if (addresses.nextElement() instanceof Inet6Address) {
+                        return true;
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            logger.debug("Unable to detect if any interface supports IPv6, assuming IPv4-only", e);
+            // ignore
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")
@@ -826,7 +851,7 @@ public class DnsNameResolver extends InetNameResolver {
         }
 
         if (!doResolveCached(hostname, additionals, promise, resolveCache)) {
-            doResolveUncached(hostname, additionals, promise, resolveCache);
+            doResolveUncached(hostname, additionals, promise, resolveCache, true);
         }
     }
 
@@ -861,22 +886,28 @@ public class DnsNameResolver extends InetNameResolver {
 
     static <T> void trySuccess(Promise<T> promise, T result) {
         if (!promise.trySuccess(result)) {
-            logger.warn("Failed to notify success ({}) to a promise: {}", result, promise);
+            // There is nothing really wrong with not be able to notify the promise as we may have raced here because
+            // of multiple queries that have been executed. Log it with trace level anyway just in case the user
+            // wants to better understand what happened.
+            logger.trace("Failed to notify success ({}) to a promise: {}", result, promise);
         }
     }
 
     private static void tryFailure(Promise<?> promise, Throwable cause) {
         if (!promise.tryFailure(cause)) {
-            logger.warn("Failed to notify failure to a promise: {}", promise, cause);
+            // There is nothing really wrong with not be able to notify the promise as we may have raced here because
+            // of multiple queries that have been executed. Log it with trace level anyway just in case the user
+            // wants to better understand what happened.
+            logger.trace("Failed to notify failure to a promise: {}", promise, cause);
         }
     }
 
     private void doResolveUncached(String hostname,
                                    DnsRecord[] additionals,
                                    final Promise<InetAddress> promise,
-                                   DnsCache resolveCache) {
+                                   DnsCache resolveCache, boolean completeEarlyIfPossible) {
         final Promise<List<InetAddress>> allPromise = executor().newPromise();
-        doResolveAllUncached(hostname, additionals, allPromise, resolveCache);
+        doResolveAllUncached(hostname, additionals, allPromise, resolveCache, true);
         allPromise.addListener(new FutureListener<List<InetAddress>>() {
             @Override
             public void operationComplete(Future<List<InetAddress>> future) {
@@ -923,7 +954,7 @@ public class DnsNameResolver extends InetNameResolver {
         }
 
         if (!doResolveAllCached(hostname, additionals, promise, resolveCache, resolvedInternetProtocolFamilies)) {
-            doResolveAllUncached(hostname, additionals, promise, resolveCache);
+            doResolveAllUncached(hostname, additionals, promise, resolveCache, false);
         }
     }
 
@@ -966,33 +997,35 @@ public class DnsNameResolver extends InetNameResolver {
     private void doResolveAllUncached(final String hostname,
                                       final DnsRecord[] additionals,
                                       final Promise<List<InetAddress>> promise,
-                                      final DnsCache resolveCache) {
+                                      final DnsCache resolveCache,
+                                      final boolean completeEarlyIfPossible) {
         // Call doResolveUncached0(...) in the EventLoop as we may need to submit multiple queries which would need
         // to submit multiple Runnable at the end if we are not already on the EventLoop.
         EventExecutor executor = executor();
         if (executor.inEventLoop()) {
-            doResolveAllUncached0(hostname, additionals, promise, resolveCache);
+            doResolveAllUncached0(hostname, additionals, promise, resolveCache, completeEarlyIfPossible);
         } else {
             executor.execute(new Runnable() {
                 @Override
                 public void run() {
-                    doResolveAllUncached0(hostname, additionals, promise, resolveCache);
+                    doResolveAllUncached0(hostname, additionals, promise, resolveCache, completeEarlyIfPossible);
                 }
             });
         }
     }
 
     private void doResolveAllUncached0(String hostname,
-                                      DnsRecord[] additionals,
-                                      Promise<List<InetAddress>> promise,
-                                      DnsCache resolveCache) {
+                                       DnsRecord[] additionals,
+                                       Promise<List<InetAddress>> promise,
+                                       DnsCache resolveCache,
+                                       boolean completeEarlyIfPossible) {
 
         assert executor().inEventLoop();
 
         final DnsServerAddressStream nameServerAddrs =
                 dnsServerAddressStreamProvider.nameServerAddressStream(hostname);
-        new DnsAddressResolveContext(this, hostname, additionals, nameServerAddrs,
-                                     resolveCache, authoritativeDnsServerCache).resolve(promise);
+        new DnsAddressResolveContext(this, hostname, additionals, nameServerAddrs, resolveCache,
+                authoritativeDnsServerCache, completeEarlyIfPossible).resolve(promise);
     }
 
     private static String hostname(String inetHost) {

@@ -1233,6 +1233,15 @@ public class DnsNameResolverTest {
             } else {
                 assertEquals(ipv6Address, resolved.getHostAddress());
             }
+            InetAddress ipv4InetAddress = InetAddress.getByAddress("netty.com",
+                    InetAddress.getByName(ipv4Address).getAddress());
+            InetAddress ipv6InetAddress = InetAddress.getByAddress("netty.com",
+                    InetAddress.getByName(ipv6Address).getAddress());
+
+            List<InetAddress> resolvedAll = resolver.resolveAll("netty.com").syncUninterruptibly().getNow();
+            List<InetAddress> expected = types == ResolvedAddressTypes.IPV4_PREFERRED ?
+                    Arrays.asList(ipv4InetAddress, ipv6InetAddress) :  Arrays.asList(ipv6InetAddress, ipv4InetAddress);
+            assertEquals(expected, resolvedAll);
         } finally {
             nonCompliantDnsServer.stop();
         }
@@ -2538,5 +2547,102 @@ public class DnsNameResolverTest {
             idx += len;
         }
         return list;
+    }
+
+    @Test
+    public void testNotIncludeDuplicates() throws IOException {
+        final String name = "netty.io";
+        final String ipv4Addr = "1.2.3.4";
+        TestDnsServer dnsServer2 = new TestDnsServer(new RecordStore() {
+            @Override
+            public Set<ResourceRecord> getRecords(QuestionRecord question) {
+                Set<ResourceRecord> records = new LinkedHashSet<ResourceRecord>(4);
+                String qName = question.getDomainName().toLowerCase();
+                if (qName.equals(name)) {
+                    records.add(new TestDnsServer.TestResourceRecord(
+                            qName, RecordType.CNAME,
+                            Collections.<String, Object>singletonMap(
+                                    DnsAttribute.DOMAIN_NAME.toLowerCase(), "cname.netty.io")));
+                    records.add(new TestDnsServer.TestResourceRecord(qName,
+                            RecordType.A, Collections.<String, Object>singletonMap(
+                            DnsAttribute.IP_ADDRESS.toLowerCase(), ipv4Addr)));
+                } else {
+                    records.add(new TestDnsServer.TestResourceRecord(qName,
+                            RecordType.A, Collections.<String, Object>singletonMap(
+                            DnsAttribute.IP_ADDRESS.toLowerCase(), ipv4Addr)));
+                }
+                return records;
+            }
+        });
+        dnsServer2.start();
+        DnsNameResolver resolver = null;
+        try {
+            DnsNameResolverBuilder builder = newResolver()
+                    .recursionDesired(true)
+                    .maxQueriesPerResolve(16)
+                    .nameServerProvider(new SingletonDnsServerAddressStreamProvider(dnsServer2.localAddress()));
+            builder.resolvedAddressTypes(ResolvedAddressTypes.IPV4_ONLY);
+
+            resolver = builder.build();
+            List<InetAddress> resolvedAddresses = resolver.resolveAll(name).syncUninterruptibly().getNow();
+            assertEquals(Collections.singletonList(InetAddress.getByAddress(name, new byte[] { 1, 2, 3, 4 })),
+                    resolvedAddresses);
+        } finally {
+            dnsServer2.stop();
+            if (resolver != null) {
+                resolver.close();
+            }
+        }
+    }
+
+    @Test
+    public void testDropAAAA() throws IOException {
+        String host = "somehost.netty.io";
+        TestDnsServer dnsServer2 = new TestDnsServer(Collections.singleton(host));
+        dnsServer2.start(true);
+        DnsNameResolver resolver = null;
+        try {
+            DnsNameResolverBuilder builder = newResolver()
+                    .recursionDesired(false)
+                    .queryTimeoutMillis(500)
+                    .resolvedAddressTypes(ResolvedAddressTypes.IPV4_PREFERRED)
+                    .maxQueriesPerResolve(16)
+                    .nameServerProvider(new SingletonDnsServerAddressStreamProvider(dnsServer2.localAddress()));
+
+            resolver = builder.build();
+            List<InetAddress> addressList = resolver.resolveAll(host).syncUninterruptibly().getNow();
+            assertEquals(1, addressList.size());
+            assertEquals(host, addressList.get(0).getHostName());
+        } finally {
+            dnsServer2.stop();
+            if (resolver != null) {
+                resolver.close();
+            }
+        }
+    }
+
+    @Test(timeout = 2000)
+    public void testDropAAAAResolveFastFast() throws IOException {
+        String host = "somehost.netty.io";
+        TestDnsServer dnsServer2 = new TestDnsServer(Collections.singleton(host));
+        dnsServer2.start(true);
+        DnsNameResolver resolver = null;
+        try {
+            DnsNameResolverBuilder builder = newResolver()
+                    .recursionDesired(false)
+                    .queryTimeoutMillis(10000)
+                    .resolvedAddressTypes(ResolvedAddressTypes.IPV4_PREFERRED)
+                    .maxQueriesPerResolve(16)
+                    .nameServerProvider(new SingletonDnsServerAddressStreamProvider(dnsServer2.localAddress()));
+
+            resolver = builder.build();
+            InetAddress address = resolver.resolve(host).syncUninterruptibly().getNow();
+            assertEquals(host, address.getHostName());
+        } finally {
+            dnsServer2.stop();
+            if (resolver != null) {
+                resolver.close();
+            }
+        }
     }
 }
